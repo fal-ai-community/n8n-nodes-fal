@@ -1,0 +1,22 @@
+{
+	"compilerOptions": {
+		"strict": true,
+		"module": "commonjs",
+		"moduleResolution": "node",
+		"target": "es2019",
+		"lib": ["es2019"],
+		"types": ["node"],
+		"declaration": true,
+		"skipLibCheck": true,
+		"noImplicitAny": true,
+		"strictNullChecks": true,
+		"esModuleInterop": true,
+		"resolveJsonModule": true,
+		"removeComments": true,
+		"forceConsistentCasingInFileNames": true,
+		"outDir": "./dist",
+		"rootDir": "."
+	},
+	"include": ["nodes/**/*", "credentials/**/*"],
+	"exclude": ["node_modules/", "dist/"]
+}
