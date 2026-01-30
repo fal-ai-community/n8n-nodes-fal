@@ -18,14 +18,14 @@
 		"stable-diffusion"
 	],
 	"license": "MIT",
-	"homepage": "https://github.com/fal-ai-community/n8n-nodes-fal-ai",
+	"homepage": "https://github.com/fal-ai-community/n8n-nodes-fal",
 	"author": {
 		"name": "fal.ai",
 		"email": "support@fal.ai"
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/fal-ai-community/n8n-nodes-fal-ai.git"
+		"url": "https://github.com/fal-ai-community/n8n-nodes-fal.git"
 	},
 	"engines": {
 		"node": ">=18.10",
