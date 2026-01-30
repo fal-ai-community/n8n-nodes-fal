@@ -3,6 +3,7 @@ import type {
 	ICredentialTestRequest,
 	ICredentialType,
 	INodeProperties,
+	Icon,
 } from 'n8n-workflow';
 
 export class FalAiApi implements ICredentialType {
@@ -12,7 +13,7 @@ export class FalAiApi implements ICredentialType {
 
 	documentationUrl = 'https://fal.ai/docs';
 
-	icon = { light: 'file:../nodes/FalAi/falai.svg', dark: 'file:../nodes/FalAi/falai.svg' } as const;
+	icon: Icon = 'file:../icons/falai.svg';
 
 	properties: INodeProperties[] = [
 		{
@@ -31,7 +32,7 @@ export class FalAiApi implements ICredentialType {
 		type: 'generic',
 		properties: {
 			headers: {
-				Authorization: '=Key {{$credentials.apiKey}}',
+				Authorization: '=Key {{$credentials?.apiKey}}',
 				'User-Agent': 'n8n-nodes-fal/1.0.0',
 			},
 		},
