@@ -12,6 +12,8 @@ export class FalAiApi implements ICredentialType {
 
 	documentationUrl = 'https://fal.ai/docs';
 
+	icon = { light: 'file:../nodes/FalAi/falai.svg', dark: 'file:../nodes/FalAi/falai.svg' } as const;
+
 	properties: INodeProperties[] = [
 		{
 			displayName: 'API Key',
@@ -30,6 +32,9 @@ export class FalAiApi implements ICredentialType {
 		properties: {
 			headers: {
 				Authorization: '=Key {{$credentials.apiKey}}',
+				'User-Agent': 'fal-n8n/1.0.0',
+				'X-Fal-Client': 'n8n-nodes-fal-ai',
+				'X-Fal-Client-Version': '1.0.0',
 			},
 		},
 	};
@@ -39,6 +44,11 @@ export class FalAiApi implements ICredentialType {
 			baseURL: 'https://api.fal.ai',
 			url: '/v1/models',
 			method: 'GET',
+			headers: {
+				'User-Agent': 'fal-n8n/1.0.0',
+				'X-Fal-Client': 'n8n-nodes-fal-ai',
+				'X-Fal-Client-Version': '1.0.0',
+			},
 			qs: {
 				limit: 1,
 			},

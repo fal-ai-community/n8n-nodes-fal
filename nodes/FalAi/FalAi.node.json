@@ -1,5 +1,5 @@
 {
-	"node": "n8n-nodes-base.falAi",
+	"node": "n8n-nodes-fal-ai",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
 	"categories": ["AI", "Marketing & Content"],
@@ -15,8 +15,8 @@
 			}
 		]
 	},
-	"alias": ["ai", "image", "video", "generation", "flux", "kling", "stable diffusion", "tts", "stt"],
+	"alias": ["ai", "image", "video", "generation", "flux", "kling", "stable diffusion", "tts", "stt", "workflow"],
 	"subcategories": {
-		"AI": ["Image Generation", "Video Generation", "Audio"]
+		"AI": ["Image Generation", "Video Generation", "Audio", "Workflows"]
 	}
 }
