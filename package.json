@@ -38,15 +38,16 @@
 		"build": "tsc && gulp build:icons",
 		"dev": "tsc --watch",
 		"format": "prettier nodes credentials --write",
-		"lint": "eslint nodes credentials package.json",
-		"lintfix": "eslint nodes credentials package.json --fix",
-		"prepublishOnly": "pnpm build && pnpm lint -c .eslintrc.prepublish.js nodes credentials package.json"
+		"lint": "eslint nodes/**/*.ts credentials/**/*.ts",
+		"lintfix": "eslint nodes/**/*.ts credentials/**/*.ts --fix",
+		"prepublishOnly": "pnpm build && pnpm lint"
 	},
 	"files": [
 		"dist"
 	],
 	"n8n": {
 		"n8nNodesApiVersion": 1,
+		"strict": true,
 		"credentials": [
 			"dist/credentials/FalAiApi.credentials.js"
 		],
@@ -57,7 +58,7 @@
 	"devDependencies": {
 		"@types/node": "^24.10.2",
 		"@typescript-eslint/eslint-plugin": "^8.49.0",
-		"@typescript-eslint/parser": "^7.15.0",
+		"@typescript-eslint/parser": "^8.49.0",
 		"eslint": "^8.56.0",
 		"eslint-plugin-n8n-nodes-base": "^1.16.1",
 		"gulp": "^4.0.2",

@@ -8,7 +8,6 @@ module.exports = {
 	parserOptions: {
 		project: ['./tsconfig.json'],
 		sourceType: 'module',
-		extraFileExtensions: ['.json'],
 	},
 	ignorePatterns: ['.eslintrc.js', '.eslintrc.prepublish.js', 'gulpfile.js', 'node_modules/', 'dist/'],
 	plugins: ['@typescript-eslint', 'eslint-plugin-n8n-nodes-base'],
