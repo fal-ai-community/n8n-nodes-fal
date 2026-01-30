@@ -33,7 +33,7 @@ export class FalAiApi implements ICredentialType {
 		properties: {
 			headers: {
 				Authorization: '=Key {{$credentials?.apiKey}}',
-				'User-Agent': 'n8n-nodes-fal/1.0.0',
+				'User-Agent': 'n8n-nodes-fal/1.0.1',
 			},
 		},
 	};

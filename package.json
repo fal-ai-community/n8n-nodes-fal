@@ -1,6 +1,6 @@
 {
 	"name": "@fal-ai/n8n-nodes-fal",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "n8n community node for fal.ai - access hundreds of AI models for image generation, video generation, text-to-speech, and more",
 	"publishConfig": {
 		"access": "public"
