@@ -10,7 +10,7 @@ import type {
 	JsonObject,
 	JsonValue,
 } from 'n8n-workflow';
-import { NodeApiError, NodeOperationError, sleep } from 'n8n-workflow';
+import { NodeApiError, NodeConnectionTypes, NodeOperationError, sleep } from 'n8n-workflow';
 
 interface FalModelMetadata {
 	display_name?: string;
@@ -334,8 +334,8 @@ export class FalAi implements INodeType {
 		defaults: {
 			name: 'fal.ai',
 		},
-		inputs: ['main'],
-		outputs: ['main'],
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
 		usableAsTool: true,
 		credentials: [
 			{

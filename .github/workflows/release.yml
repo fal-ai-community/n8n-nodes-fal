@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., 1.2.0, 1.3.0-alpha.0)"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry run (will not publish to npm)"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write # Required for npm trusted publishing (OIDC)
+  contents: read
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Extract version info
+        id: version-info
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual trigger
+            VERSION="${{ inputs.version }}"
+          else
+            # Tag trigger
+            TAG_NAME=${{ github.ref_name }}
+            VERSION=$(echo $TAG_NAME | sed 's/^v//')
+          fi
+
+          # Extract npm tag based on version qualifier
+          if [[ $VERSION =~ .*-([a-zA-Z]+)\.[0-9]+$ ]]; then
+            NPM_TAG="${BASH_REMATCH[1]}"
+          elif [[ $VERSION =~ .*-([a-zA-Z]+)$ ]]; then
+            NPM_TAG="${BASH_REMATCH[1]}"
+          else
+            NPM_TAG="latest"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "npm_tag=$NPM_TAG" >> $GITHUB_OUTPUT
+
+      - name: Build package
+        run: pnpm build
+
+      - name: Verify package version
+        run: |
+          PACKAGE_JSON_VERSION=$(node -p "require('./package.json').version")
+          if [ "$PACKAGE_JSON_VERSION" != "${{ steps.version-info.outputs.version }}" ]; then
+            echo "Package version ($PACKAGE_JSON_VERSION) does not match tag version (${{ steps.version-info.outputs.version }})"
+            exit 1
+          fi
+
+      - name: Publish package
+        run: |
+          echo "Publishing @fal-ai/n8n-nodes-fal@${{ steps.version-info.outputs.version }} with tag ${{ steps.version-info.outputs.npm_tag }}"
+          npm publish --access public --tag ${{ steps.version-info.outputs.npm_tag }} ${{ inputs.dry_run && '--dry-run' || '' }}

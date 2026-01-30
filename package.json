@@ -1,7 +1,10 @@
 {
-	"name": "n8n-nodes-fal-ai",
+	"name": "@fal-ai/n8n-nodes-fal",
 	"version": "1.0.0",
 	"description": "n8n community node for fal.ai - access hundreds of AI models for image generation, video generation, text-to-speech, and more",
+	"publishConfig": {
+		"access": "public"
+	},
 	"keywords": [
 		"n8n-community-node-package",
 		"fal.ai",
@@ -58,7 +61,6 @@
 		"eslint": "^8.56.0",
 		"eslint-plugin-n8n-nodes-base": "^1.16.1",
 		"gulp": "^4.0.2",
-		"n8n-workflow": "*",
 		"prettier": "^3.3.2",
 		"typescript": "^5.5.3"
 	},

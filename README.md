@@ -1,103 +1,108 @@
-# n8n-nodes-fal-ai
+# @fal-ai/n8n-nodes-fal
 
-This is an n8n community node for [fal.ai](https://fal.ai) - access hundreds of AI models for image generation, video generation, text-to-speech, and more.
-
-## Features
-
-- **Generate Media**: Create images, videos, audio using any fal.ai model
-- **Dynamic Parameters**: Auto-loads model-specific parameters
-- **Usage Statistics**: Monitor your fal.ai usage and costs (Admin Key required)
-- **Payload Management**: Delete request payloads to manage storage (Admin Key required)
-- **Model Discovery**: Search hundreds of available models
+n8n community node for [fal.ai](https://fal.ai) - access hundreds of AI models for image generation, video generation, text-to-speech, and more.
 
 ## Installation
 
-### Via n8n Community Nodes
+### In n8n Desktop/Cloud
 
-1. Open n8n **Settings** > **Community Nodes**
-2. Click **Install**
-3. Enter `n8n-nodes-fal-ai`
-4. Install
+1. Go to **Settings** > **Community Nodes**
+2. Click **Install a community node**
+3. Enter `@fal-ai/n8n-nodes-fal`
+4. Click **Install**
 
 ### Manual Installation
 
 ```bash
-cd ~/.n8n
-npm install n8n-nodes-fal-ai
+cd ~/.n8n/nodes
+npm install @fal-ai/n8n-nodes-fal
 ```
 
-## Credentials Setup
+## Configuration
 
-1. Get your API key from [fal.ai/dashboard/keys](https://fal.ai/dashboard/keys)
-2. In n8n, create **fal.ai API** credentials
+1. Get your API key from [fal.ai Dashboard](https://fal.ai/dashboard/keys)
+2. In n8n, go to **Credentials** > **Add Credential** > **fal.ai API**
 3. Enter your API key
 
-⚠️ **Important**: Use an **Admin API Key** for Get Usage and Delete Payloads operations.
+> **Note:** Some operations (Get Usage, Delete Payloads) require an **Admin API Key**.
 
-## Operations
+## Features
 
-### Generate Media
+### Model Operations
 
-Generate images, videos, or audio using any fal.ai model.
+| Operation | Description |
+|-----------|-------------|
+| **Generate Media** | Generate images, videos, audio using any fal.ai model |
+| **Get Model Info** | Get available parameters and schema for a model |
+| **Get Analytics** | Get performance metrics (latency, success rates, error counts) |
+| **Get Pricing** | Get pricing information for models |
+| **Get Usage** | Get usage statistics (requires Admin API Key) |
+| **List Requests** | List requests for a specific endpoint/model |
+| **Delete Request Payloads** | Delete request payloads (requires Admin API Key) |
 
-- Select a model from the list or enter model ID
-- Add dynamic parameters (automatically loaded from model schema)
-- Configure wait time and polling options
+### Workflow Operations
 
-### Get Model Info
+| Operation | Description |
+|-----------|-------------|
+| **Run Workflow** | Execute a fal.ai workflow with dynamic parameters |
+| **List Workflows** | List all your fal.ai workflows |
+| **Get Workflow Details** | Get details and schema of a specific workflow |
 
-Retrieve detailed information about a model's parameters and capabilities.
+## Usage Examples
 
-### Get Usage ⚠️ Admin Key Required
+### Generate an Image with Flux
 
-Monitor your workspace usage and costs:
-- Filter by model or see all models
-- Select time range (30min, 1hr, 24hr, 7d, 30d, custom)
-- View detailed billing information
+1. Add **fal.ai** node to your workflow
+2. Select **Model** resource and **Generate Media** operation
+3. Search and select `fal-ai/flux/dev` model
+4. Add parameter: `prompt` = "A beautiful sunset over mountains"
+5. Execute the node
 
-### Delete Request Payloads ⚠️ Admin Key Required
+### Run a Custom Workflow
 
-Delete request payloads and associated CDN files to manage storage costs.
+1. Add **fal.ai** node to your workflow
+2. Select **Workflow** resource and **Run Workflow** operation
+3. Select your workflow from the dropdown
+4. Add workflow-specific parameters
+5. Execute the node
 
-## Quick Examples
+### Monitor Model Performance
 
-### Image Generation (FLUX)
-```
-Model: fal-ai/flux/dev
-Parameters:
-  - prompt: "A serene Japanese garden"
-  - num_images: 1
-```
+1. Add **fal.ai** node to your workflow
+2. Select **Model** resource and **Get Analytics** operation
+3. Select a model (e.g., `fal-ai/flux/dev`)
+4. Choose time range and metrics
+5. Execute to get performance data
 
-### Video from Image (Kling)
-```
-Model: fal-ai/kling-video/v1.6/pro/image-to-video
-Parameters:
-  - image_url: "https://example.com/image.jpg"
-  - duration: "5"
-```
+## Supported Models
 
-### Usage Monitoring
-```
-Operation: Get Usage
-Time Range: Last 24 Hours
-Model: fal-ai/flux/dev (optional)
-```
+This node supports all models available on fal.ai, including:
 
-## API Key Types
+- **Image Generation**: Flux, Stable Diffusion, SDXL, etc.
+- **Video Generation**: Kling, Runway, etc.
+- **Text-to-Speech**: Various TTS models
+- **Speech-to-Text**: Whisper and other STT models
+- **Image Editing**: Inpainting, upscaling, style transfer
+- **And many more...**
 
-| Operation | Regular Key | Admin Key |
-|-----------|-------------|-----------|
-| Generate Media | ✅ | ✅ |
-| Get Model Info | ✅ | ✅ |
-| Get Usage | ❌ | ✅ |
-| Delete Payloads | ❌ | ✅ |
+Browse all models at [fal.ai/models](https://fal.ai/models)
 
-## Resources
+## Async Execution
+
+For long-running generations (videos, complex images), the node uses fal.ai's queue system:
+
+- **Wait for Completion**: Enable to wait for the result (default)
+- **Poll Interval**: How often to check status (default: 5 seconds)
+- **Max Wait Time**: Maximum wait time (default: 10 minutes)
+
+Disable "Wait for Completion" to get the request ID immediately and check status later.
+
+## Links
 
 - [fal.ai Documentation](https://fal.ai/docs)
-- [Model Gallery](https://fal.ai/models)
-- [API Keys Dashboard](https://fal.ai/dashboard/keys)
+- [fal.ai Models](https://fal.ai/models)
+- [fal.ai Dashboard](https://fal.ai/dashboard)
+- [GitHub Repository](https://github.com/fal-ai-community/n8n-nodes-fal)
 
 ## License
 
