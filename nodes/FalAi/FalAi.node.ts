@@ -47,6 +47,12 @@ interface OpenAPISchema {
 	components?: {
 		schemas?: Record<string, SchemaDefinition>;
 	};
+	paths?: Record<string, Record<string, OpenAPIOperation>>;
+}
+
+interface OpenAPIOperation {
+	requestBody?: { content?: Record<string, { schema?: { $ref?: string } }> };
+	responses?: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }>;
 }
 
 interface SchemaDefinition {
@@ -149,16 +155,35 @@ function parseOpenAPISchema(model: FalModel): ParsedModelInfo {
 	const falMetadata = openapi?.['x-fal-metadata'];
 	const schemas = openapi?.components?.schemas || {};
 
+	// The submit request body and the result response name the endpoint's own
+	// schemas. Matching on `Input`/`Output` alone can pick a nested type instead
+	// (Kling's `KlingV3ComboElementInput`), so names are only a fallback.
+	const schemaFromRef = (ref: string | undefined): SchemaDefinition | undefined => {
+		const prefix = '#/components/schemas/';
+		return ref?.startsWith(prefix) ? schemas[ref.slice(prefix.length)] : undefined;
+	};
 	let inputSchema: SchemaDefinition | undefined;
 	let outputSchema: SchemaDefinition | undefined;
-
-	for (const [name, schema] of Object.entries(schemas)) {
-		if (name.endsWith('Input') && !name.includes('Queue')) {
-			inputSchema = schema;
-		} else if (name.endsWith('Output') && !name.includes('Queue')) {
-			outputSchema = schema;
+	for (const [path, operations] of Object.entries(openapi?.paths || {})) {
+		const submit = operations.post?.requestBody?.content?.['application/json']?.schema?.$ref;
+		inputSchema = inputSchema || schemaFromRef(submit);
+		if (path.endsWith('/requests/{request_id}')) {
+			const result = operations.get?.responses?.['200']?.content?.['application/json']?.schema?.$ref;
+			outputSchema = outputSchema || schemaFromRef(result);
 		}
 	}
+
+	let inputByName: SchemaDefinition | undefined;
+	let outputByName: SchemaDefinition | undefined;
+	for (const [name, schema] of Object.entries(schemas)) {
+		if (name.endsWith('Input') && !name.includes('Queue')) {
+			inputByName = schema;
+		} else if (name.endsWith('Output') && !name.includes('Queue')) {
+			outputByName = schema;
+		}
+	}
+	inputSchema = inputSchema || inputByName;
+	outputSchema = outputSchema || outputByName;
 
 	const parseProperties = (
 		schema: SchemaDefinition | undefined,
@@ -210,12 +235,41 @@ function parseOpenAPISchema(model: FalModel): ParsedModelInfo {
 	};
 }
 
+const DEFAULT_API_BASE_URL = 'https://api.fal.ai';
+const DEFAULT_QUEUE_BASE_URL = 'https://queue.fal.run';
+
+interface FalBaseUrls {
+	api: string;
+	queue: string;
+}
+
+async function getBaseUrls(context: IExecuteFunctions | ILoadOptionsFunctions): Promise<FalBaseUrls> {
+	const credentials = await context.getCredentials('falAiApi');
+	return {
+		api: ((credentials.apiBaseUrl as string) || DEFAULT_API_BASE_URL).replace(/\/+$/, ''),
+		queue: ((credentials.queueBaseUrl as string) || DEFAULT_QUEUE_BASE_URL).replace(/\/+$/, ''),
+	};
+}
+
+// The queue returns absolute queue.fal.run URLs; move them onto the configured queue base URL
+function rebaseQueueUrl(url: string, queueBaseUrl: string): string {
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		return url;
+	}
+	if (parsed.origin !== DEFAULT_QUEUE_BASE_URL) return url;
+	return `${queueBaseUrl}${parsed.pathname}${parsed.search}`;
+}
+
 // Cache for model schemas
 const modelSchemaCache: Map<string, { data: ParsedModelInfo; timestamp: number }> = new Map();
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
 async function getModelSchema(
 	modelId: string,
+	apiBaseUrl: string,
 	httpRequest: (options: IHttpRequestOptions) => Promise<unknown>,
 ): Promise<ParsedModelInfo | null> {
 	const cached = modelSchemaCache.get(modelId);
@@ -226,7 +280,7 @@ async function getModelSchema(
 	try {
 		const response = await httpRequest({
 			method: 'GET',
-			url: 'https://api.fal.ai/v1/models',
+			url: `${apiBaseUrl}/v1/models`,
 			qs: {
 				endpoint_id: modelId,
 				expand: 'openapi-3.0',
@@ -328,7 +382,9 @@ export class FalAi implements INodeType {
 		name: 'falAi',
 		icon: 'file:falai.svg',
 		group: ['transform'],
-		version: 1,
+		// 1.1: requests go to the credential's base URLs instead of hardcoded hosts
+		version: [1, 1.1],
+		defaultVersion: 1.1,
 		subtitle: '={{$parameter["operation"] + ": " + ($parameter["model"]?.value || $parameter["model"] || $parameter["workflowId"] || "")}}',
 		description: 'Generate AI content using fal.ai models and workflows',
 		defaults: {
@@ -1419,9 +1475,10 @@ export class FalAi implements INodeType {
 					qs.cursor = paginationToken;
 				}
 
+				const baseUrls = await getBaseUrls(this);
 				const response = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 					method: 'GET',
-					url: 'https://api.fal.ai/v1/models',
+					url: `${baseUrls.api}/v1/models`,
 					qs,
 				}) as FalModelsResponse;
 
@@ -1456,14 +1513,16 @@ export class FalAi implements INodeType {
 				filter?: string,
 			): Promise<{ results: INodePropertyOptions[]; paginationToken?: string }> {
 				try {
+					const baseUrls = await getBaseUrls(this);
+
 					// First, get the current user's info to construct workflow IDs
 					let username: string | undefined;
 
 					// Try multiple endpoints to get user info
 					const userEndpoints = [
-						'https://api.fal.ai/v1/users/me',
-						'https://api.fal.ai/users/me',
-						'https://api.fal.ai/v1/user',
+						`${baseUrls.api}/v1/users/me`,
+						`${baseUrls.api}/users/me`,
+						`${baseUrls.api}/v1/user`,
 					];
 
 					for (const endpoint of userEndpoints) {
@@ -1483,7 +1542,7 @@ export class FalAi implements INodeType {
 
 					const response = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 						method: 'GET',
-						url: 'https://api.fal.ai/v1/workflows',
+						url: `${baseUrls.api}/v1/workflows`,
 					}) as FalWorkflowsResponse & Record<string, unknown>;
 
 					// Handle different response formats
@@ -1569,9 +1628,10 @@ export class FalAi implements INodeType {
 						return [{ name: 'Select a Model First', value: '', description: 'Choose a model above to see available parameters' }];
 					}
 
+					const baseUrls = await getBaseUrls(this);
 					const authedRequest = (options: IHttpRequestOptions) =>
 						this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', options);
-					const schema = await getModelSchema(modelId, authedRequest);
+					const schema = await getModelSchema(modelId, baseUrls.api, authedRequest);
 
 					if (!schema) {
 						return [{ name: 'Could Not Load Parameters', value: '', description: 'Model not found. Verify the model ID is correct.' }];
@@ -1625,9 +1685,10 @@ export class FalAi implements INodeType {
 
 					// Fetch workflow details to get schema
 					// API returns an array: [{ workflow: { contents: { schema: { input: {...} } } } }]
+					const baseUrls = await getBaseUrls(this);
 					const response = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 						method: 'GET',
-						url: `https://api.fal.ai/v1/workflows/${workflowId}`,
+						url: `${baseUrls.api}/v1/workflows/${workflowId}`,
 					}) as unknown;
 
 					// Handle both array and object response formats
@@ -1713,6 +1774,7 @@ export class FalAi implements INodeType {
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
+		const baseUrls = await getBaseUrls(this);
 
 		for (let i = 0; i < items.length; i++) {
 			try {
@@ -1806,7 +1868,7 @@ export class FalAi implements INodeType {
 						// Get analytics data
 						const analyticsResponse = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 							method: 'GET',
-							url: 'https://api.fal.ai/v1/models/analytics',
+							url: `${baseUrls.api}/v1/models/analytics`,
 							qs,
 						}) as IDataObject;
 
@@ -1836,7 +1898,7 @@ export class FalAi implements INodeType {
 						// Get pricing data
 						const pricingResponse = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 							method: 'GET',
-							url: 'https://api.fal.ai/v1/models/pricing',
+							url: `${baseUrls.api}/v1/models/pricing`,
 							qs: {
 								endpoint_id: endpointId,
 							},
@@ -1926,7 +1988,7 @@ export class FalAi implements INodeType {
 						// Get usage data
 						const usageResponse = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 							method: 'GET',
-							url: 'https://api.fal.ai/v1/models/usage',
+							url: `${baseUrls.api}/v1/models/usage`,
 							qs,
 						}) as IDataObject;
 
@@ -1968,7 +2030,7 @@ export class FalAi implements INodeType {
 						// Delete request payloads
 						const deleteResponse = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 							method: 'DELETE',
-							url: `https://api.fal.ai/v1/models/requests/${requestId}/payloads`,
+							url: `${baseUrls.api}/v1/models/requests/${requestId}/payloads`,
 						}) as { cdn_delete_results: Array<{ link: string; exception: string | null }> };
 
 						result = {
@@ -2059,7 +2121,7 @@ export class FalAi implements INodeType {
 						// Get requests data
 						const requestsResponse = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 							method: 'GET',
-							url: 'https://api.fal.ai/v1/models/requests/by-endpoint',
+							url: `${baseUrls.api}/v1/models/requests/by-endpoint`,
 							qs,
 						}) as IDataObject;
 
@@ -2077,7 +2139,7 @@ export class FalAi implements INodeType {
 						const model = this.getNodeParameter('model', i, '', { extractValue: true }) as string;
 						const authedRequest = (options: IHttpRequestOptions) =>
 							this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', options);
-						const parsedInfo = await getModelSchema(model, authedRequest);
+						const parsedInfo = await getModelSchema(model, baseUrls.api, authedRequest);
 
 						if (!parsedInfo) {
 							throw new NodeOperationError(this.getNode(), `Model '${model}' not found. Verify the model ID is correct and the model is available.`);
@@ -2130,15 +2192,15 @@ export class FalAi implements INodeType {
 						// Submit to queue
 						const queueResponse = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 							method: 'POST',
-							url: `https://queue.fal.run/${submitPath}`,
+							url: `${baseUrls.queue}/${submitPath}`,
 							headers: { 'Content-Type': 'application/json' },
 							body: input,
 						}) as QueueSubmitResponse;
 
 						const requestId = queueResponse.request_id;
-						const statusUrl = queueResponse.status_url || `https://queue.fal.run/${baseModelId}/requests/${requestId}/status`;
-						const responseUrl = queueResponse.response_url || `https://queue.fal.run/${baseModelId}/requests/${requestId}`;
-						const cancelUrl = queueResponse.cancel_url || `https://queue.fal.run/${baseModelId}/requests/${requestId}/cancel`;
+						const statusUrl = queueResponse.status_url || `${baseUrls.queue}/${baseModelId}/requests/${requestId}/status`;
+						const responseUrl = queueResponse.response_url || `${baseUrls.queue}/${baseModelId}/requests/${requestId}`;
+						const cancelUrl = queueResponse.cancel_url || `${baseUrls.queue}/${baseModelId}/requests/${requestId}/cancel`;
 
 						if (!waitForCompletion) {
 							result = {
@@ -2156,14 +2218,14 @@ export class FalAi implements INodeType {
 							while (Date.now() - startTime < maxWaitTime) {
 								const statusResponse = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 									method: 'GET',
-									url: statusUrl,
+									url: rebaseQueueUrl(statusUrl, baseUrls.queue),
 								}) as QueueStatusResponse;
 
 								if (statusResponse.status === 'COMPLETED') {
 									const resolvedResponseUrl = statusResponse.response_url || responseUrl;
 									const resultResponse = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 										method: 'GET',
-										url: resolvedResponseUrl,
+										url: rebaseQueueUrl(resolvedResponseUrl, baseUrls.queue),
 									});
 
 									result = {
@@ -2255,16 +2317,16 @@ export class FalAi implements INodeType {
 						// Submit to queue - workflow endpoint format: workflows/username/workflow_name
 						const queueResponseRaw = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 							method: 'POST',
-							url: `https://queue.fal.run/workflows/${workflowId}`,
+							url: `${baseUrls.queue}/workflows/${workflowId}`,
 							headers: { 'Content-Type': 'application/json' },
 							body: input,
 						});
 						const queueResponse = queueResponseRaw as QueueSubmitResponse;
 
 						const requestId = queueResponse.request_id;
-						const statusUrl = queueResponse.status_url || `https://queue.fal.run/workflows/${workflowId}/requests/${requestId}/status`;
-						const responseUrl = queueResponse.response_url || `https://queue.fal.run/workflows/${workflowId}/requests/${requestId}`;
-						const cancelUrl = queueResponse.cancel_url || `https://queue.fal.run/workflows/${workflowId}/requests/${requestId}/cancel`;
+						const statusUrl = queueResponse.status_url || `${baseUrls.queue}/workflows/${workflowId}/requests/${requestId}/status`;
+						const responseUrl = queueResponse.response_url || `${baseUrls.queue}/workflows/${workflowId}/requests/${requestId}`;
+						const cancelUrl = queueResponse.cancel_url || `${baseUrls.queue}/workflows/${workflowId}/requests/${requestId}/cancel`;
 
 						if (!waitForCompletion) {
 							result = {
@@ -2282,7 +2344,7 @@ export class FalAi implements INodeType {
 							while (Date.now() - startTime < maxWaitTime) {
 								const statusResponseRaw = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 									method: 'GET',
-									url: statusUrl,
+									url: rebaseQueueUrl(statusUrl, baseUrls.queue),
 								});
 								const statusResponse = statusResponseRaw as QueueStatusResponse;
 
@@ -2290,7 +2352,7 @@ export class FalAi implements INodeType {
 									const resolvedResponseUrl = statusResponse.response_url || responseUrl;
 									const resultResponse = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 										method: 'GET',
-										url: resolvedResponseUrl,
+										url: rebaseQueueUrl(resolvedResponseUrl, baseUrls.queue),
 									});
 
 									result = {
@@ -2331,7 +2393,7 @@ export class FalAi implements INodeType {
 					} else if (operation === 'listWorkflows') {
 						result = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 							method: 'GET',
-							url: 'https://api.fal.ai/v1/workflows',
+							url: `${baseUrls.api}/v1/workflows`,
 						}) as IDataObject;
 
 					} else if (operation === 'getWorkflow') {
@@ -2346,7 +2408,7 @@ export class FalAi implements INodeType {
 
 						result = await this.helpers.httpRequestWithAuthentication.call(this, 'falAiApi', {
 							method: 'GET',
-							url: `https://api.fal.ai/v1/workflows/${workflowId}`,
+							url: `${baseUrls.api}/v1/workflows/${workflowId}`,
 						}) as IDataObject;
 
 					} else {

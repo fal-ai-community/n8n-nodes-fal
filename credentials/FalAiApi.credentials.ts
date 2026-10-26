@@ -26,6 +26,18 @@ export class FalAiApi implements ICredentialType {
 			description: 'Your fal.ai API key from https://fal.ai/dashboard/keys. Note: Admin API Key required for Get Usage and Delete Payloads operations.',
 			hint: 'Use an Admin API Key to access usage statistics and delete operations',
 		},
+		{
+			displayName: 'API Base URL',
+			name: 'apiBaseUrl',
+			type: 'hidden',
+			default: 'https://api.fal.ai',
+		},
+		{
+			displayName: 'Queue Base URL',
+			name: 'queueBaseUrl',
+			type: 'hidden',
+			default: 'https://queue.fal.run',
+		},
 	];
 
 	authenticate: IAuthenticateGeneric = {
@@ -40,7 +52,7 @@ export class FalAiApi implements ICredentialType {
 
 	test: ICredentialTestRequest = {
 		request: {
-			baseURL: 'https://api.fal.ai',
+			baseURL: '={{$credentials.apiBaseUrl}}',
 			url: '/v1/models',
 			method: 'GET',
 			qs: {
